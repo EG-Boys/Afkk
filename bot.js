@@ -2,18 +2,20 @@ const mineflayer = require('mineflayer');
 const config = require('./config.json');
 
 const range = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
+const rangeF = (min, max) => Math.random() * (max - min) + min;
 
-// ─── PROCESS-LEVEL CRASH GUARD ───────────────────────────────────────────────
+// ─── CRASH GUARD ─────────────────────────────────────────────────────────────
 
 process.on('uncaughtException', (err) => {
-  console.error(`💥 Uncaught exception (kept alive): ${err.message}`);
+  console.error(`💥 Uncaught exception: ${err.message}`);
 });
 
 process.on('unhandledRejection', (reason) => {
-  console.error(`💥 Unhandled rejection (kept alive): ${reason}`);
+  console.error(`💥 Unhandled rejection: ${reason}`);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+
 function createBot() {
 
   let bot = mineflayer.createBot({
@@ -21,62 +23,154 @@ function createBot() {
     port: config.serverPort,
     username: config.botUsername,
     auth: 'offline',
-    version: '1.21.1', // ✅ fixed
+    version: '1.21.1',
     checkTimeoutInterval: 60000,
+    physicsEnabled: false,
   });
 
   let alive   = true;
   let spawned = false;
 
-  // ─── PACKET-LEVEL ERROR GUARD ─────────────────────────────────────────────
+  let currentYaw   = 0;
+  let currentPitch = 0;
+  let targetYaw    = 0;
+  let targetPitch  = 0;
+
+  // ─── PACKET ERROR GUARD ───────────────────────────────────────────────────
 
   bot._client.on('error', (err) => {
-    console.error(`📦 Packet error (connection kept): ${err.message}`);
+    console.error(`📦 Packet error: ${err.message}`);
   });
 
-  // ─── PACKET-LEVEL ERROR GUARD ─────────────────────────────────────────────
-
-  bot._client.on('error', (err) => {
-    console.error(`📦 Packet error (connection kept): ${err.message}`);
-  });
-
-  // ─── LOGIN ────────────────────────────────────────────────────────────────
+  // ─── SPAWN + LOGIN ────────────────────────────────────────────────────────
 
   bot.on('spawn', () => {
     if (spawned) return;
     spawned = true;
 
-    console.log(`⚔️  ${config.botUsername} joined the server!`);
+    currentYaw   = bot.entity.yaw;
+    currentPitch = bot.entity.pitch;
+    targetYaw    = currentYaw;
+    targetPitch  = currentPitch;
+
+    console.log(`⚔️  ${config.botUsername} joined!`);
 
     setTimeout(() => {
       if (!alive) return;
-      bot.chat('/login fuck69');
+      bot.chat(`/login ${config.botPassword}`);
       console.log('🔑 Login sent.');
-    }, 2000);
+    }, 3000);
 
-    // ✅ Increased to 6000ms — gives server time to fully position the bot
     setTimeout(() => {
       if (!alive) return;
-      movementLoop();
+      console.log('✅ Starting loops...');
+      smoothLookLoop();
+      smoothSwingLoop();
+      sprintCrouchLoop();
+      jumpLoop();
       combatLoop();
-      interactionLoop();
-    }, 6000);
+    }, 7000);
   });
 
-  // ─── MOVEMENT LOOP ────────────────────────────────────────────────────────
+  // ─── SMOOTH LOOK LOOP ─────────────────────────────────────────────────────
 
-  function movementLoop() {
-  if (!alive) return;
+  function smoothLookLoop() {
+    if (!alive) return;
 
-  if (bot && bot.entity) {
-    try {
-      // Only rotate — zero movement packets sent, Paper can't flag it
-      bot.look(Math.random() * Math.PI * 2, 0, true);
-    } catch (e) {}
+    if (bot && bot.entity) {
+      try {
+        const yawDiff   = targetYaw   - currentYaw;
+        const pitchDiff = targetPitch - currentPitch;
+
+        currentYaw   += yawDiff   * 0.08;
+        currentPitch += pitchDiff * 0.08;
+
+        bot.look(currentYaw, currentPitch, true);
+
+        if (Math.abs(yawDiff) < 0.01 && Math.abs(pitchDiff) < 0.01) {
+          targetYaw   = currentYaw + rangeF(-Math.PI / 2, Math.PI / 2);
+          targetPitch = rangeF(-0.3, 0.3);
+        }
+
+      } catch (e) {}
+    }
+
+    setTimeout(smoothLookLoop, 50);
   }
 
-  setTimeout(movementLoop, range(4000, 7000));
+  // ─── SMOOTH SWING LOOP ────────────────────────────────────────────────────
+
+  function smoothSwingLoop() {
+    if (!alive) return;
+
+    if (bot && bot.entity) {
+      try {
+        const hand = Math.random() > 0.85 ? 'left' : 'right';
+        bot.swingArm(hand);
+      } catch (e) {}
     }
+
+    setTimeout(smoothSwingLoop, range(4000, 10000));
+  }
+
+  // ─── SPRINT + CROUCH LOOP ─────────────────────────────────────────────────
+
+  function sprintCrouchLoop() {
+    if (!alive) return;
+
+    if (bot && bot.entity) {
+      try {
+        const action = Math.random();
+
+        if (action < 0.4) {
+          bot.setControlState('sprint', true);
+          setTimeout(() => {
+            try { if (alive && bot) bot.setControlState('sprint', false); } catch(e) {}
+          }, range(300, 800));
+
+        } else if (action < 0.7) {
+          bot.setControlState('sneak', true);
+          setTimeout(() => {
+            try { if (alive && bot) bot.setControlState('sneak', false); } catch(e) {}
+          }, range(500, 1500));
+
+        } else if (action < 0.85) {
+          bot.setControlState('sprint', true);
+          setTimeout(() => {
+            try {
+              if (alive && bot) {
+                bot.setControlState('sprint', false);
+                bot.setControlState('sneak', true);
+              }
+            } catch(e) {}
+            setTimeout(() => {
+              try { if (alive && bot) bot.setControlState('sneak', false); } catch(e) {}
+            }, range(300, 700));
+          }, range(200, 500));
+        }
+
+      } catch (e) {}
+    }
+
+    setTimeout(sprintCrouchLoop, range(8000, 20000));
+  }
+
+  // ─── JUMP LOOP ────────────────────────────────────────────────────────────
+
+  function jumpLoop() {
+    if (!alive) return;
+
+    if (bot && bot.entity) {
+      try {
+        bot.setControlState('jump', true);
+        setTimeout(() => {
+          try { if (alive && bot) bot.setControlState('jump', false); } catch(e) {}
+        }, 200);
+      } catch (e) {}
+    }
+
+    setTimeout(jumpLoop, range(25000, 50000));
+  }
 
   // ─── COMBAT LOOP ──────────────────────────────────────────────────────────
 
@@ -92,39 +186,16 @@ function createBot() {
         if (entity && bot.entity.position.distanceTo(entity.position) < 4) {
           bot.lookAt(entity.position.offset(0, entity.height, 0));
           bot.attack(entity);
-        } else {
           bot.swingArm('right');
         }
-
       } catch (e) {}
     }
 
-    setTimeout(combatLoop, range(600, 1500));
+    setTimeout(combatLoop, range(800, 1500));
   }
 
-  // ─── INTERACTION LOOP ─────────────────────────────────────────────────────
+  // ─── KICKED ───────────────────────────────────────────────────────────────
 
-  let lastInteraction = 0;
-
-  function interactionLoop() {
-    if (!alive) return;
-
-    const now = Date.now();
-
-    if (bot && bot.entity && Math.random() > 0.8 && (now - lastInteraction) > 15000) {
-      try {
-        lastInteraction = now;
-        bot.activateItem();
-        setTimeout(() => { if (alive && bot) bot.deactivateItem(); }, 300);
-      } catch (e) {}
-    }
-
-    setTimeout(interactionLoop, range(15000, 40000));
-  }
-
-  // ─── DISCONNECT HANDLING + MEMORY CLEANUP ─────────────────────────────────
-
-  // ✅ Fixed [object Object] kick message
   bot.on('kicked', (reason) => {
     let readable = reason;
     try {
@@ -137,16 +208,19 @@ function createBot() {
     console.log(`⚠️  Kicked: ${readable}`);
   });
 
+  // ─── ERROR ────────────────────────────────────────────────────────────────
+
   bot.on('error', (err) => {
     console.error(`❌ Bot error: ${err.message}`);
   });
 
+  // ─── DISCONNECT + CLEANUP + RECONNECT ─────────────────────────────────────
+
   bot.on('end', (reason) => {
     alive = false;
 
-    console.log(`⛔ Disconnected. Reason: ${reason || 'unknown'}`);
+    console.log(`⛔ Disconnected: ${reason || 'unknown'}`);
 
-    // ── MEMORY CLEANUP ──────────────────────────────────────────────────────
     try {
       bot.removeAllListeners();
       bot._client.removeAllListeners();
@@ -156,7 +230,7 @@ function createBot() {
 
     if (global.gc) {
       global.gc();
-      console.log('🗑️  Garbage collection triggered.');
+      console.log('🗑️  GC triggered.');
     }
 
     console.log('🔄 Reconnecting in 60 seconds...');
