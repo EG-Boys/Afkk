@@ -1,4 +1,3 @@
-
 const mineflayer = require('mineflayer');
 const config = require('./config.json');
 
@@ -49,12 +48,13 @@ function createBot() {
       console.log('🔑 Login sent.');
     }, 2000);
 
+    // ✅ Increased to 6000ms — gives server time to fully position the bot
     setTimeout(() => {
       if (!alive) return;
       movementLoop();
       combatLoop();
       interactionLoop();
-    }, 3500);
+    }, 6000);
   });
 
   // ─── MOVEMENT LOOP ────────────────────────────────────────────────────────
@@ -88,7 +88,6 @@ function createBot() {
       } catch (e) {}
     }
 
-    // Longer gap to reduce packet spam
     setTimeout(movementLoop, range(4000, 7000));
   }
 
@@ -138,9 +137,16 @@ function createBot() {
 
   // ─── DISCONNECT HANDLING + MEMORY CLEANUP ─────────────────────────────────
 
+  // ✅ Fixed [object Object] kick message
   bot.on('kicked', (reason) => {
     let readable = reason;
-    try { readable = JSON.parse(reason)?.text || reason; } catch (_) {}
+    try {
+      if (typeof reason === 'object') {
+        readable = reason?.text || reason?.extra?.[0]?.text || JSON.stringify(reason);
+      } else {
+        readable = JSON.parse(reason)?.text || reason;
+      }
+    } catch (_) { readable = String(reason); }
     console.log(`⚠️  Kicked: ${readable}`);
   });
 
@@ -167,7 +173,7 @@ function createBot() {
     }
 
     console.log('🔄 Reconnecting in 60 seconds...');
-    setTimeout(createBot, 60000); // ✅ 1 minute reconnect
+    setTimeout(createBot, 60000);
   });
 
 }
