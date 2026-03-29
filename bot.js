@@ -14,7 +14,6 @@ process.on('unhandledRejection', (reason) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-
 function createBot() {
 
   let bot = mineflayer.createBot({
@@ -22,11 +21,18 @@ function createBot() {
     port: config.serverPort,
     username: config.botUsername,
     auth: 'offline',
-    version: false,
+    version: '1.21.1', // ✅ fixed
+    checkTimeoutInterval: 60000,
   });
 
   let alive   = true;
   let spawned = false;
+
+  // ─── PACKET-LEVEL ERROR GUARD ─────────────────────────────────────────────
+
+  bot._client.on('error', (err) => {
+    console.error(`📦 Packet error (connection kept): ${err.message}`);
+  });
 
   // ─── PACKET-LEVEL ERROR GUARD ─────────────────────────────────────────────
 
