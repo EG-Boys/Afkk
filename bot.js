@@ -1,3 +1,4 @@
+
 const mineflayer = require('mineflayer');
 const config = require('./config.json');
 
@@ -63,31 +64,32 @@ function createBot() {
 
     if (bot && bot.entity) {
       try {
-        const actions = ['forward', 'back', 'left', 'right', 'jump', 'sneak'];
-
-        // ✅ Always clear ALL states first
-        actions.forEach(a => bot.setControlState(a, false));
-
-        // ✅ Only pick safe directional actions (avoids invalid move packets)
+        const allActions = ['forward', 'back', 'left', 'right', 'jump', 'sneak'];
         const safeActions = ['forward', 'back', 'left', 'right'];
+
+        // Clear all states first
+        allActions.forEach(a => bot.setControlState(a, false));
+
         const chosen = safeActions[range(0, safeActions.length - 1)];
         bot.setControlState(chosen, true);
 
-        // ✅ Stop after a short burst so Paper doesn't flag it
+        // Short burst then stop
         setTimeout(() => {
-          if (alive && bot && bot.entity) {
-            actions.forEach(a => bot.setControlState(a, false));
-          }
-        }, range(500, 1500));
+          try {
+            if (alive && bot && bot.entity) {
+              allActions.forEach(a => bot.setControlState(a, false));
+            }
+          } catch (e) {}
+        }, 400);
 
-        // ✅ Keep pitch at 0 — wild vertical angles trigger invalid packet errors
-        bot.look(Math.random() * Math.PI * 2, 0, false);
+        // Smooth look, flat pitch only
+        bot.look(Math.random() * Math.PI * 2, 0, true);
 
       } catch (e) {}
     }
 
-    // ✅ Slightly slower interval to reduce packet spam
-    setTimeout(movementLoop, range(2000, 4000));
+    // Longer gap to reduce packet spam
+    setTimeout(movementLoop, range(4000, 7000));
   }
 
   // ─── COMBAT LOOP ──────────────────────────────────────────────────────────
@@ -164,8 +166,8 @@ function createBot() {
       console.log('🗑️  Garbage collection triggered.');
     }
 
-    console.log('🔄 Reconnecting in 10 seconds...');
-    setTimeout(createBot, 10000);
+    console.log('🔄 Reconnecting in 60 seconds...');
+    setTimeout(createBot, 60000); // ✅ 1 minute reconnect
   });
 
 }
