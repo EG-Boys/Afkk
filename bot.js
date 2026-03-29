@@ -41,6 +41,26 @@ function createBot() {
     console.error(`📦 Packet error: ${err.message}`);
   });
 
+  // ─── FIX: Inject yaw+pitch into bare position packets ────────────────────
+  // Paper 1.21.1 requires yaw+pitch in every position packet.
+  // Mineflayer sometimes sends position-only packets without them, causing
+  // the "Invalid data: x=true, y=true, z=true, yaw=false, pitch=false" kick.
+
+  const _write = bot._client.write.bind(bot._client);
+  bot._client.write = (name, data) => {
+    if (name === 'position' && bot.entity) {
+      return _write('position_look', {
+        ...data,
+        yaw: -(bot.entity.yaw * (180 / Math.PI)) % 360,
+        pitch: -(bot.entity.pitch * (180 / Math.PI)) % 360,
+        onGround: data.onGround ?? true,
+      });
+    }
+    return _write(name, data);
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+
   // ─── SPAWN + LOGIN ────────────────────────────────────────────────────────
 
   bot.on('spawn', () => {
@@ -280,7 +300,6 @@ function createBot() {
       console.log('🗑️  GC triggered.');
     }
 
-    // ✅ 30 seconds, retries forever until it connects
     console.log('🔄 Reconnecting in 30 seconds...');
     setTimeout(createBot, 30000);
   });
