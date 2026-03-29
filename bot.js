@@ -25,7 +25,6 @@ function createBot() {
     auth: 'offline',
     version: '1.21.1',
     checkTimeoutInterval: 60000,
-    physicsEnabled: false,
   });
 
   let alive   = true;
@@ -66,10 +65,10 @@ function createBot() {
       console.log('✅ Starting loops...');
       smoothLookLoop();
       smoothSwingLoop();
-      sprintCrouchLoop();
+      movementLoop();
       jumpLoop();
       combatLoop();
-    }, 7000);
+    }, 12000);
   });
 
   // ─── SMOOTH LOOK LOOP ─────────────────────────────────────────────────────
@@ -89,7 +88,7 @@ function createBot() {
 
         if (Math.abs(yawDiff) < 0.01 && Math.abs(pitchDiff) < 0.01) {
           targetYaw   = currentYaw + rangeF(-Math.PI / 2, Math.PI / 2);
-          targetPitch = rangeF(-0.3, 0.3);
+          targetPitch = rangeF(-0.25, 0.25);
         }
 
       } catch (e) {}
@@ -110,31 +109,62 @@ function createBot() {
       } catch (e) {}
     }
 
-    setTimeout(smoothSwingLoop, range(4000, 10000));
+    setTimeout(smoothSwingLoop, range(3000, 8000));
   }
 
-  // ─── SPRINT + CROUCH LOOP ─────────────────────────────────────────────────
+  // ─── MOVEMENT LOOP ────────────────────────────────────────────────────────
 
-  function sprintCrouchLoop() {
+  function movementLoop() {
     if (!alive) return;
 
     if (bot && bot.entity) {
       try {
+        const allControls = ['forward', 'back', 'left', 'right', 'sprint', 'sneak'];
+
+        allControls.forEach(a => {
+          try { bot.setControlState(a, false); } catch(e) {}
+        });
+
         const action = Math.random();
 
-        if (action < 0.4) {
+        if (action < 0.25) {
+          // Normal walk forward
+          bot.setControlState('forward', true);
+          setTimeout(() => {
+            try { if (alive && bot) bot.setControlState('forward', false); } catch(e) {}
+          }, range(600, 1200));
+
+        } else if (action < 0.50) {
+          // Sprint forward
+          bot.setControlState('forward', true);
           bot.setControlState('sprint', true);
           setTimeout(() => {
-            try { if (alive && bot) bot.setControlState('sprint', false); } catch(e) {}
-          }, range(300, 800));
+            try {
+              if (alive && bot) {
+                bot.setControlState('forward', false);
+                bot.setControlState('sprint', false);
+              }
+            } catch(e) {}
+          }, range(500, 1000));
 
-        } else if (action < 0.7) {
+        } else if (action < 0.65) {
+          // Strafe left or right
+          const dir = Math.random() > 0.5 ? 'left' : 'right';
+          bot.setControlState(dir, true);
+          setTimeout(() => {
+            try { if (alive && bot) bot.setControlState(dir, false); } catch(e) {}
+          }, range(400, 900));
+
+        } else if (action < 0.78) {
+          // Crouch
           bot.setControlState('sneak', true);
           setTimeout(() => {
             try { if (alive && bot) bot.setControlState('sneak', false); } catch(e) {}
-          }, range(500, 1500));
+          }, range(600, 1800));
 
-        } else if (action < 0.85) {
+        } else if (action < 0.88) {
+          // Sprint + crouch combo
+          bot.setControlState('forward', true);
           bot.setControlState('sprint', true);
           setTimeout(() => {
             try {
@@ -144,15 +174,22 @@ function createBot() {
               }
             } catch(e) {}
             setTimeout(() => {
-              try { if (alive && bot) bot.setControlState('sneak', false); } catch(e) {}
-            }, range(300, 700));
-          }, range(200, 500));
+              try {
+                if (alive && bot) {
+                  bot.setControlState('forward', false);
+                  bot.setControlState('sneak', false);
+                }
+              } catch(e) {}
+            }, range(400, 800));
+          }, range(300, 600));
+
         }
+        // else: idle this cycle
 
       } catch (e) {}
     }
 
-    setTimeout(sprintCrouchLoop, range(8000, 20000));
+    setTimeout(movementLoop, range(6000, 14000));
   }
 
   // ─── JUMP LOOP ────────────────────────────────────────────────────────────
@@ -162,14 +199,24 @@ function createBot() {
 
     if (bot && bot.entity) {
       try {
+        if (Math.random() > 0.5) {
+          bot.setControlState('forward', true);
+          bot.setControlState('sprint', true);
+        }
         bot.setControlState('jump', true);
         setTimeout(() => {
-          try { if (alive && bot) bot.setControlState('jump', false); } catch(e) {}
-        }, 200);
+          try {
+            if (alive && bot) {
+              bot.setControlState('jump', false);
+              bot.setControlState('forward', false);
+              bot.setControlState('sprint', false);
+            }
+          } catch(e) {}
+        }, 250);
       } catch (e) {}
     }
 
-    setTimeout(jumpLoop, range(25000, 50000));
+    setTimeout(jumpLoop, range(20000, 45000));
   }
 
   // ─── COMBAT LOOP ──────────────────────────────────────────────────────────
@@ -233,8 +280,9 @@ function createBot() {
       console.log('🗑️  GC triggered.');
     }
 
-    console.log('🔄 Reconnecting in 60 seconds...');
-    setTimeout(createBot, 60000);
+    // ✅ 30 seconds, retries forever until it connects
+    console.log('🔄 Reconnecting in 30 seconds...');
+    setTimeout(createBot, 30000);
   });
 
 }
