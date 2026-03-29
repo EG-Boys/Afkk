@@ -60,36 +60,17 @@ function createBot() {
   // ─── MOVEMENT LOOP ────────────────────────────────────────────────────────
 
   function movementLoop() {
-    if (!alive) return;
+  if (!alive) return;
 
-    if (bot && bot.entity) {
-      try {
-        const allActions = ['forward', 'back', 'left', 'right', 'jump', 'sneak'];
-        const safeActions = ['forward', 'back', 'left', 'right'];
-
-        // Clear all states first
-        allActions.forEach(a => bot.setControlState(a, false));
-
-        const chosen = safeActions[range(0, safeActions.length - 1)];
-        bot.setControlState(chosen, true);
-
-        // Short burst then stop
-        setTimeout(() => {
-          try {
-            if (alive && bot && bot.entity) {
-              allActions.forEach(a => bot.setControlState(a, false));
-            }
-          } catch (e) {}
-        }, 400);
-
-        // Smooth look, flat pitch only
-        bot.look(Math.random() * Math.PI * 2, 0, true);
-
-      } catch (e) {}
-    }
-
-    setTimeout(movementLoop, range(4000, 7000));
+  if (bot && bot.entity) {
+    try {
+      // Only rotate — zero movement packets sent, Paper can't flag it
+      bot.look(Math.random() * Math.PI * 2, 0, true);
+    } catch (e) {}
   }
+
+  setTimeout(movementLoop, range(4000, 7000));
+    }
 
   // ─── COMBAT LOOP ──────────────────────────────────────────────────────────
 
